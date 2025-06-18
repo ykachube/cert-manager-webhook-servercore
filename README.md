@@ -1,4 +1,4 @@
-# ACME webhook for Servercore DNS API
+# ACME webhook for Servercore DNS API forked from https://github.com/vadimkim/cert-manager-webhook-hetzner
 
 This solver can be used when you want to use cert-manager with Servercore DNS API. API documentation is [here](https://dns.servercore.com/api-docs)
 
