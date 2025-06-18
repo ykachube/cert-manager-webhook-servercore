@@ -46,6 +46,66 @@ type servercoreDNSProviderConfig struct {
 	ApiUrl    string `json:"apiUrl"`
 }
 
+func getAuthToken(config *internal.Config) (string, error) {
+    // Return cached token if still valid
+    if config.authToken != "" && time.Now().Before(config.tokenExpiry) {
+        return config.authToken, nil
+    }
+    
+    // Create auth request
+    authRequest := map[string]interface{}{
+        "auth": map[string]interface{}{
+            "identity": map[string]interface{}{
+                "methods": []string{"password"},
+                "password": map[string]interface{}{
+                    "user": map[string]interface{}{
+                        "name":     config.Username,
+                        "domain":   map[string]interface{}{"name": config.AccountID},
+                        "password": config.Password,
+                    },
+                },
+            },
+            "scope": map[string]interface{}{
+                "project": map[string]interface{}{
+                    "name":   config.ProjectName,
+                    "domain": map[string]interface{}{"name": config.AccountID},
+                },
+            },
+        },
+    }
+    
+    jsonData, err := json.Marshal(authRequest)
+    if err != nil {
+        return "", err
+    }
+    
+    // Make request to auth API
+    req, err := http.NewRequest("POST", config.AuthURL+"/auth/tokens", bytes.NewBuffer(jsonData))
+    if err != nil {
+        return "", err
+    }
+    req.Header.Set("Content-Type", "application/json")
+    
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+    
+    // Get token from header
+    token := resp.Header.Get("X-Subject-Token")
+    if token == "" {
+        return "", errors.New("no token in response")
+    }
+    
+    // Cache token for 23 hours (tokens last 24 hours)
+    config.authToken = token
+    config.tokenExpiry = time.Now().Add(23 * time.Hour)
+    
+    return token, nil
+}
+
 func (c *servercoreDNSProviderSolver) Name() string {
 	return "servercore"
 }
@@ -150,24 +210,46 @@ func stringFromSecretData(secretData map[string][]byte, key string) (string, err
 	return string(data), nil
 }
 
-func addTxtRecord(config internal.Config, ch *v1alpha1.ChallengeRequest) {
-	url := config.ApiUrl + "/records"
-
-	name := recordName(ch.ResolvedFQDN, config.ZoneName)
-	zoneId, err := searchZoneId(config)
-
-	if err != nil {
-		klog.Errorf("unable to find id for zone name `%s`; %v", config.ZoneName, err)
-	}
-
-	var jsonStr = fmt.Sprintf(`{"value":%q, "ttl":120, "type":"TXT", "name":%q, "zone_id":%q}`, ch.Key, name, zoneId)
-
-	add, err := callDnsApi(url, "POST", bytes.NewBuffer([]byte(jsonStr)), config)
-
-	if err != nil {
-		klog.Error(err)
-	}
-	klog.Infof("Added TXT record result: %s", string(add))
+func addTxtRecord(config internal.Config, ch *v1alpha1.ChallengeRequest) error {
+    zoneId, err := searchZoneId(config)
+    if err != nil {
+        return fmt.Errorf("unable to find id for zone name `%s`; %v", config.ZoneName, err)
+    }
+    
+    url := fmt.Sprintf("%s/zones/%s/rrset", config.ApiUrl, zoneId)  // Use correct endpoint
+    
+    // Create request payload in the format that worked in your curl tests
+    recordData := map[string]interface{}{
+        "name": ch.ResolvedFQDN,  // Use full FQDN with trailing dot
+        "type": "TXT",
+        "ttl": 60,
+        "records": []string{fmt.Sprintf("\"%s\"", ch.Key)}  // Format TXT value correctly
+    }
+    
+    jsonData, err := json.Marshal(recordData)
+    if err != nil {
+        return fmt.Errorf("failed to marshal record data: %v", err)
+    }
+    
+    add, err := callDnsApi(url, "POST", bytes.NewBuffer(jsonData), config)
+    if err != nil {
+        return err
+    }
+    
+    klog.Infof("Added TXT record result: %s", string(add))
+    
+    // Save record ID for cleanup
+    var response struct {
+        Id string `json:"id"`
+    }
+    if err := json.Unmarshal(add, &response); err != nil {
+        klog.Warningf("Failed to parse record ID from response: %v", err)
+    } else {
+        // Save record ID somewhere for cleanup
+        // For example, you could use annotations on the Challenge resource
+    }
+    
+    return nil
 }
 
 func clientConfig(c *servercoreDNSProviderSolver, ch *v1alpha1.ChallengeRequest) (internal.Config, error) {
@@ -222,35 +304,37 @@ func recordName(fqdn, domain string) string {
 }
 
 func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]byte, error) {
-	ctx := context.Background()
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
-	if err != nil {
-		return []byte{}, fmt.Errorf("unable to execute request %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Auth-API-Token", config.ApiKey)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		err := resp.Body.Close()
-		if err != nil {
-			klog.Fatal(err)
-		}
-	}()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode == http.StatusOK {
-		return respBody, nil
-	}
-
-	text := "Error calling API status:" + resp.Status + " url: " + url + " method: " + method
-	klog.Error(text)
-	return nil, errors.New(text)
+    // Get auth token
+    token, err := getAuthToken(&config)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get auth token: %v", err)
+    }
+    
+    ctx := context.Background()
+    req, err := http.NewRequestWithContext(ctx, method, url, body)
+    if err != nil {
+        return []byte{}, fmt.Errorf("unable to execute request %v", err)
+    }
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("X-Auth-Token", token)  // Use X-Auth-Token instead of Auth-API-Token
+    
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    
+    defer resp.Body.Close()
+    
+    respBody, _ := io.ReadAll(resp.Body)
+    if resp.StatusCode >= 200 && resp.StatusCode < 300 {  // Accept any 2xx status code
+        return respBody, nil
+    }
+    
+    text := fmt.Sprintf("Error calling API status: %s url: %s method: %s response: %s", 
+                        resp.Status, url, method, string(respBody))
+    klog.Error(text)
+    return nil, errors.New(text)
 }
 
 func searchZoneId(config internal.Config) (string, error) {
