@@ -18,7 +18,7 @@ import (
 
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook/cmd"
-	"github.com/vadimkim/cert-manager-webhook-hetzner/internal"
+	"github.com/ykachube/cert-manager-webhook-servercore/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -32,25 +32,25 @@ func main() {
 	}
 
 	cmd.RunWebhookServer(GroupName,
-		&hetznerDNSProviderSolver{},
+		&servercoreDNSProviderSolver{},
 	)
 }
 
-type hetznerDNSProviderSolver struct {
+type servercoreDNSProviderSolver struct {
 	client *kubernetes.Clientset
 }
 
-type hetznerDNSProviderConfig struct {
+type servercoreDNSProviderConfig struct {
 	SecretRef string `json:"secretName"`
 	ZoneName  string `json:"zoneName"`
 	ApiUrl    string `json:"apiUrl"`
 }
 
-func (c *hetznerDNSProviderSolver) Name() string {
-	return "hetzner"
+func (c *servercoreDNSProviderSolver) Name() string {
+	return "servercore"
 }
 
-func (c *hetznerDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
+func (c *servercoreDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 	klog.V(6).Infof("call function Present: namespace=%s, zone=%s, fqdn=%s",
 		ch.ResourceNamespace, ch.ResolvedZone, ch.ResolvedFQDN)
 
@@ -67,7 +67,7 @@ func (c *hetznerDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error 
 	return nil
 }
 
-func (c *hetznerDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
+func (c *servercoreDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	config, err := clientConfig(c, ch)
 
 	if err != nil {
@@ -117,7 +117,7 @@ func (c *hetznerDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error 
 	return nil
 }
 
-func (c *hetznerDNSProviderSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
+func (c *servercoreDNSProviderSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
 	k8sClient, err := kubernetes.NewForConfig(kubeClientConfig)
 	klog.V(6).Infof("Input variable stopCh is %d length", len(stopCh))
 	if err != nil {
@@ -129,8 +129,8 @@ func (c *hetznerDNSProviderSolver) Initialize(kubeClientConfig *rest.Config, sto
 	return nil
 }
 
-func loadConfig(cfgJSON *extapi.JSON) (hetznerDNSProviderConfig, error) {
-	cfg := hetznerDNSProviderConfig{}
+func loadConfig(cfgJSON *extapi.JSON) (servercoreDNSProviderConfig, error) {
+	cfg := servercoreDNSProviderConfig{}
 	// handle the 'base case' where no configuration has been provided
 	if cfgJSON == nil {
 		return cfg, nil
@@ -170,7 +170,7 @@ func addTxtRecord(config internal.Config, ch *v1alpha1.ChallengeRequest) {
 	klog.Infof("Added TXT record result: %s", string(add))
 }
 
-func clientConfig(c *hetznerDNSProviderSolver, ch *v1alpha1.ChallengeRequest) (internal.Config, error) {
+func clientConfig(c *servercoreDNSProviderSolver, ch *v1alpha1.ChallengeRequest) (internal.Config, error) {
 	var config internal.Config
 
 	cfg, err := loadConfig(ch.Config)
@@ -207,7 +207,7 @@ func clientConfig(c *hetznerDNSProviderSolver, ch *v1alpha1.ChallengeRequest) (i
 }
 
 /*
-Domain name in Hetzner is divided in 2 parts: record + zone name. API works
+Domain name in Servercore is divided in 2 parts: record + zone name. API works
 with record name that is FQDN without zone name. Subdomains is a part of
 record name and is separated by "."
 */
@@ -288,5 +288,5 @@ func searchZoneName(config internal.Config, searchZone string) (string, error) {
 			return config.ZoneName, nil
 		}
 	}
-	return "", fmt.Errorf("unable to find hetzner dns zone with: %s", searchZone)
+	return "", fmt.Errorf("unable to find servercore dns zone with: %s", searchZone)
 }

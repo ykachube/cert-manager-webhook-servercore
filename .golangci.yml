@@ -21,7 +21,7 @@ linters-settings:
           - k8s.io/client-go/rest
           - k8s.io/klog/v2
           - github.com/cert-manager/cert-manager
-          - github.com/vadimkim/cert-manager-webhook-hetzner/internal
+          - github.com/ykachube/cert-manager-webhook-servercore/internal
         # Packages that are not allowed where the value is a suggestion.
         deny:
           - pkg: "github.com/sirupsen/logrus"

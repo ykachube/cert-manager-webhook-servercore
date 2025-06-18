@@ -20,11 +20,11 @@ func TestRunsSuite(t *testing.T) {
 
 	fqdn = GetRandomString(20) + "." + zone
 
-	fixture := dns.NewFixture(&hetznerDNSProviderSolver{},
+	fixture := dns.NewFixture(&servercoreDNSProviderSolver{},
 		dns.SetResolvedZone(zone),
 		dns.SetResolvedFQDN(fqdn),
 		dns.SetAllowAmbientCredentials(false),
-		dns.SetManifestPath("testdata/hetzner"),
+		dns.SetManifestPath("testdata/servercore"),
 		//		dns.SetBinariesPath("kubebuilder/bin"),
 	)
 

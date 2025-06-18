@@ -18,8 +18,8 @@ COPY . .
 RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o webhook -ldflags '-w -extldflags "-static"' .
 
 FROM alpine:3.20
-LABEL maintainer="vadimkim <vadim@ant.ee>"
-LABEL org.opencontainers.image.source="https://github.com/vadimkim/cert-manager-webhook-hetzner"
+LABEL maintainer="ykachube <yury_kachubeyeu@gmail.com>"
+LABEL org.opencontainers.image.source="https://github.com/ykachube/cert-manager-webhook-servercore"
 
 RUN apk add --no-cache ca-certificates=20241121-r1
 

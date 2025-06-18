@@ -1,4 +1,4 @@
-module github.com/vadimkim/cert-manager-webhook-hetzner
+module github.com/ykachube/cert-manager-webhook-servercore
 
 go 1.23.0
 

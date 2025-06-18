@@ -2,7 +2,7 @@ GO ?= $(shell which go)
 OS ?= $(shell $(GO) env GOOS)
 ARCH ?= $(shell $(GO) env GOARCH)
 
-IMAGE_NAME := "cert-manager-webhook-hetzner"
+IMAGE_NAME := "cert-manager-webhook-servercore"
 IMAGE_TAG := "latest"
 
 OUT := $(shell pwd)/deploy
@@ -33,7 +33,7 @@ build:
 .PHONY: rendered-manifest.yaml
 rendered-manifest.yaml:
 	helm template \
-	    cert-manager-webhook-hetzner \
+	    cert-manager-webhook-servercore \
         --set image.repository=$(IMAGE_NAME) \
         --set image.tag=$(IMAGE_TAG) \
 		--namespace cert-manager \

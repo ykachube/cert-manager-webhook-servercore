@@ -1,0 +1,5 @@
+{
+  "secretName": "servercore-secret",
+  "zoneName": "example.com",
+  "apiUrl" : "https://dns.servercore.com/api/v1"
+}
