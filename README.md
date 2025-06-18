@@ -63,7 +63,7 @@ spec:
             groupName: acme.yourdomain.tld
             solverName: servercore
             config:
-              secretName: servercore-secret
+              secretName: servercore-dns-credentials
               zoneName: example.com # (Optional): When not provided the Zone will searched in Servercore API by recursion on full domain name
               apiUrl: https://dns.servercore.com/api/v1
 ```
@@ -78,11 +78,15 @@ The secret for the example above will look like this:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: servercore-secret
+  name: servercore-dns-credentials
   namespace: cert-manager
 type: Opaque
-data:
-  api-key: your-key-base64-encoded
+stringData:
+  username: "your-servercore-username"
+  password: "your-servercore-password"
+  account-id: "your-servercore-account-id"
+  project-name: "your-servercore-project-name"
+  # Optional: auth-url: "https://cloud.api.servercore.com/identity/v3"
 ```
 
 ### Create a certificate
@@ -132,7 +136,7 @@ TEST_ZONE_NAME=example.com. make verify
 
 To build new Docker image for multiple architectures and push it to hub:
 ```shell
-docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t zmejg/cert-manager-webhook-servercore:1.2.0 . --push
+docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t ykachube/cert-manager-webhook-servercore:1.2.0 . --push
 ```
 
 To compile and publish new Helm chart version:
