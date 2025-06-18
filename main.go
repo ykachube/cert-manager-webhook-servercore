@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"encoding/json"
 	"fmt"
@@ -44,66 +45,67 @@ type servercoreDNSProviderConfig struct {
 	SecretRef string `json:"secretName"`
 	ZoneName  string `json:"zoneName"`
 	ApiUrl    string `json:"apiUrl"`
+	AuthURL   string `json:"authUrl"` // Added AuthURL field
 }
 
 func getAuthToken(config *internal.Config) (string, error) {
-    // Return cached token if still valid
-    if config.authToken != "" && time.Now().Before(config.tokenExpiry) {
-        return config.authToken, nil
-    }
-    
-    // Create auth request
-    authRequest := map[string]interface{}{
-        "auth": map[string]interface{}{
-            "identity": map[string]interface{}{
-                "methods": []string{"password"},
-                "password": map[string]interface{}{
-                    "user": map[string]interface{}{
-                        "name":     config.Username,
-                        "domain":   map[string]interface{}{"name": config.AccountID},
-                        "password": config.Password,
-                    },
-                },
-            },
-            "scope": map[string]interface{}{
-                "project": map[string]interface{}{
-                    "name":   config.ProjectName,
-                    "domain": map[string]interface{}{"name": config.AccountID},
-                },
-            },
-        },
-    }
-    
-    jsonData, err := json.Marshal(authRequest)
-    if err != nil {
-        return "", err
-    }
-    
-    // Make request to auth API
-    req, err := http.NewRequest("POST", config.AuthURL+"/auth/tokens", bytes.NewBuffer(jsonData))
-    if err != nil {
-        return "", err
-    }
-    req.Header.Set("Content-Type", "application/json")
-    
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        return "", err
-    }
-    defer resp.Body.Close()
-    
-    // Get token from header
-    token := resp.Header.Get("X-Subject-Token")
-    if token == "" {
-        return "", errors.New("no token in response")
-    }
-    
-    // Cache token for 23 hours (tokens last 24 hours)
-    config.authToken = token
-    config.tokenExpiry = time.Now().Add(23 * time.Hour)
-    
-    return token, nil
+	// Return cached token if still valid
+	if config.AuthToken != "" && time.Now().Before(config.TokenExpiry) {
+		return config.AuthToken, nil
+	}
+
+	// Create auth request
+	authRequest := map[string]interface{}{
+		"auth": map[string]interface{}{
+			"identity": map[string]interface{}{
+				"methods": []string{"password"},
+				"password": map[string]interface{}{
+					"user": map[string]interface{}{
+						"name":     config.Username,
+						"domain":   map[string]interface{}{"name": config.AccountID},
+						"password": config.Password,
+					},
+				},
+			},
+			"scope": map[string]interface{}{
+				"project": map[string]interface{}{
+					"name":   config.ProjectName,
+					"domain": map[string]interface{}{"name": config.AccountID},
+				},
+			},
+		},
+	}
+
+	jsonData, err := json.Marshal(authRequest)
+	if err != nil {
+		return "", err
+	}
+
+	// Make request to auth API
+	req, err := http.NewRequest("POST", config.AuthURL+"/auth/tokens", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Get token from header
+	token := resp.Header.Get("X-Subject-Token")
+	if token == "" {
+		return "", errors.New("no token in response")
+	}
+
+	// Cache token for 23 hours (tokens last 24 hours)
+	config.AuthToken = token
+	config.TokenExpiry = time.Now().Add(23 * time.Hour)
+
+	return token, nil
 }
 
 func (c *servercoreDNSProviderSolver) Name() string {
@@ -211,45 +213,45 @@ func stringFromSecretData(secretData map[string][]byte, key string) (string, err
 }
 
 func addTxtRecord(config internal.Config, ch *v1alpha1.ChallengeRequest) error {
-    zoneId, err := searchZoneId(config)
-    if err != nil {
-        return fmt.Errorf("unable to find id for zone name `%s`; %v", config.ZoneName, err)
-    }
-    
-    url := fmt.Sprintf("%s/zones/%s/rrset", config.ApiUrl, zoneId)  // Use correct endpoint
-    
-    // Create request payload in the format that worked in your curl tests
-    recordData := map[string]interface{}{
-        "name": ch.ResolvedFQDN,  // Use full FQDN with trailing dot
-        "type": "TXT",
-        "ttl": 60,
-        "records": []string{fmt.Sprintf("\"%s\"", ch.Key)}  // Format TXT value correctly
-    }
-    
-    jsonData, err := json.Marshal(recordData)
-    if err != nil {
-        return fmt.Errorf("failed to marshal record data: %v", err)
-    }
-    
-    add, err := callDnsApi(url, "POST", bytes.NewBuffer(jsonData), config)
-    if err != nil {
-        return err
-    }
-    
-    klog.Infof("Added TXT record result: %s", string(add))
-    
-    // Save record ID for cleanup
-    var response struct {
-        Id string `json:"id"`
-    }
-    if err := json.Unmarshal(add, &response); err != nil {
-        klog.Warningf("Failed to parse record ID from response: %v", err)
-    } else {
-        // Save record ID somewhere for cleanup
-        // For example, you could use annotations on the Challenge resource
-    }
-    
-    return nil
+	zoneId, err := searchZoneId(config)
+	if err != nil {
+		return fmt.Errorf("unable to find id for zone name `%s`; %v", config.ZoneName, err)
+	}
+
+	url := fmt.Sprintf("%s/zones/%s/rrset", config.ApiUrl, zoneId) // Use correct endpoint
+
+	// Create request payload in the format that worked in your curl tests
+	recordData := map[string]interface{}{
+		"name":    ch.ResolvedFQDN, // Use full FQDN with trailing dot
+		"type":    "TXT",
+		"ttl":     60,
+		"records": []string{fmt.Sprintf("\"%s\"", ch.Key)}, // Format TXT value correctly
+	}
+
+	jsonData, err := json.Marshal(recordData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal record data: %v", err)
+	}
+
+	add, err := callDnsApi(url, "POST", bytes.NewBuffer(jsonData), config)
+	if err != nil {
+		return err
+	}
+
+	klog.Infof("Added TXT record result: %s", string(add))
+
+	// Save record ID for cleanup
+	var response struct {
+		Id string `json:"id"`
+	}
+	if err := json.Unmarshal(add, &response); err != nil {
+		klog.Warningf("Failed to parse record ID from response: %v", err)
+	} else {
+		// Save record ID somewhere for cleanup
+		// For example, you could use annotations on the Challenge resource
+	}
+
+	return nil
 }
 
 func clientConfig(c *servercoreDNSProviderSolver, ch *v1alpha1.ChallengeRequest) (internal.Config, error) {
@@ -262,18 +264,48 @@ func clientConfig(c *servercoreDNSProviderSolver, ch *v1alpha1.ChallengeRequest)
 	config.ZoneName = cfg.ZoneName
 	config.ApiUrl = cfg.ApiUrl
 
+	// Set default auth URL if not provided in config
+	if cfg.AuthURL != "" {
+		config.AuthURL = cfg.AuthURL
+	} else {
+		config.AuthURL = "https://cloud.api.servercore.com/identity/v3"
+	}
+
 	secretName := cfg.SecretRef
 	sec, err := c.client.CoreV1().Secrets(ch.ResourceNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
-
 	if err != nil {
 		return config, fmt.Errorf("unable to get secret `%s/%s`; %v", secretName, ch.ResourceNamespace, err)
 	}
 
-	apiKey, err := stringFromSecretData(sec.Data, "api-key")
-	config.ApiKey = apiKey
-
+	// Load ServerCore credentials from the secret
+	username, err := stringFromSecretData(sec.Data, "username")
 	if err != nil {
-		return config, fmt.Errorf("unable to get api-key from secret `%s/%s`; %v", secretName, ch.ResourceNamespace, err)
+		return config, fmt.Errorf("unable to get username from secret `%s/%s`; %v", secretName, ch.ResourceNamespace, err)
+	}
+	config.Username = username
+
+	password, err := stringFromSecretData(sec.Data, "password")
+	if err != nil {
+		return config, fmt.Errorf("unable to get password from secret `%s/%s`; %v", secretName, ch.ResourceNamespace, err)
+	}
+	config.Password = password
+
+	accountID, err := stringFromSecretData(sec.Data, "account-id")
+	if err != nil {
+		return config, fmt.Errorf("unable to get account-id from secret `%s/%s`; %v", secretName, ch.ResourceNamespace, err)
+	}
+	config.AccountID = accountID
+
+	projectName, err := stringFromSecretData(sec.Data, "project-name")
+	if err != nil {
+		return config, fmt.Errorf("unable to get project-name from secret `%s/%s`; %v", secretName, ch.ResourceNamespace, err)
+	}
+	config.ProjectName = projectName
+
+	// Optional auth URL override from secret
+	authURL, err := stringFromSecretData(sec.Data, "auth-url")
+	if err == nil && authURL != "" {
+		config.AuthURL = authURL
 	}
 
 	// Get ZoneName by api search if not provided by config
@@ -304,37 +336,37 @@ func recordName(fqdn, domain string) string {
 }
 
 func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]byte, error) {
-    // Get auth token
-    token, err := getAuthToken(&config)
-    if err != nil {
-        return nil, fmt.Errorf("failed to get auth token: %v", err)
-    }
-    
-    ctx := context.Background()
-    req, err := http.NewRequestWithContext(ctx, method, url, body)
-    if err != nil {
-        return []byte{}, fmt.Errorf("unable to execute request %v", err)
-    }
-    req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("X-Auth-Token", token)  // Use X-Auth-Token instead of Auth-API-Token
-    
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    
-    defer resp.Body.Close()
-    
-    respBody, _ := io.ReadAll(resp.Body)
-    if resp.StatusCode >= 200 && resp.StatusCode < 300 {  // Accept any 2xx status code
-        return respBody, nil
-    }
-    
-    text := fmt.Sprintf("Error calling API status: %s url: %s method: %s response: %s", 
-                        resp.Status, url, method, string(respBody))
-    klog.Error(text)
-    return nil, errors.New(text)
+	// Get auth token
+	token, err := getAuthToken(&config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth token: %v", err)
+	}
+
+	ctx := context.Background()
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return []byte{}, fmt.Errorf("unable to execute request %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Auth-Token", token) // Use X-Auth-Token instead of Auth-API-Token
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 { // Accept any 2xx status code
+		return respBody, nil
+	}
+
+	text := fmt.Sprintf("Error calling API status: %s url: %s method: %s response: %s",
+		resp.Status, url, method, string(respBody))
+	klog.Error(text)
+	return nil, errors.New(text)
 }
 
 func searchZoneId(config internal.Config) (string, error) {
