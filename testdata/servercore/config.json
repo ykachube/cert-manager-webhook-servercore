@@ -1,5 +1,6 @@
 {
   "secretName": "servercore-secret",
   "zoneName": "example.com",
-  "apiUrl" : "https://dns.servercore.com/api/v1"
+  "apiUrl": "https://api.servercore.com/domains/v2",
+  "authUrl": "https://cloud.api.servercore.com/identity/v3"
 }
