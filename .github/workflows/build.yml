@@ -26,7 +26,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ykachube/cert-manager-webhook-servercore
             ghcr.io/ykachube/cert-manager-webhook-servercore
           tags: |
             type=ref,event=branch
