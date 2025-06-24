@@ -136,51 +136,72 @@ func (c *servercoreDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) err
 
 func (c *servercoreDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	config, err := clientConfig(c, ch)
-
 	if err != nil {
 		return fmt.Errorf("unable to get secret `%s`; %v", ch.ResourceNamespace, err)
 	}
 
 	zoneId, err := searchZoneId(config)
-
 	if err != nil {
 		return fmt.Errorf("unable to find id for zone name `%s`; %v", config.ZoneName, err)
 	}
 
-	var url = config.ApiUrl + "/records?zone_id=" + zoneId
+	// List records
+	url := fmt.Sprintf("%s/zones/%s/rrset", config.ApiUrl, zoneId)
+	klog.Infof("[DEBUG] Listing records with URL: %s", url)
 
-	// Get all DNS records
 	dnsRecords, err := callDnsApi(url, "GET", nil, config)
-
 	if err != nil {
-		return fmt.Errorf("unable to get DNS records %v", err)
+		klog.Errorf("[DEBUG] Failed to list records: %v", err)
+		return nil // Continue with cleanup
 	}
 
-	// Unmarshall response
-	records := internal.RecordResponse{}
-	readErr := json.Unmarshal(dnsRecords, &records)
+	klog.Infof("[DEBUG] Records response: %s", string(dnsRecords))
 
-	if readErr != nil {
-		return fmt.Errorf("unable to unmarshal response %v", readErr)
+	// Find the challenge record
+	acmePrefix := "_acme-challenge."
+	targetName := acmePrefix + recordName(ch.ResolvedFQDN, config.ZoneName)
+	klog.Infof("[DEBUG] Looking for record with name: %s", targetName)
+
+	var recordsResp struct {
+		Result []struct {
+			Id   string `json:"id"`
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"result"`
 	}
 
-	var recordId string
-	name := recordName(ch.ResolvedFQDN, config.ZoneName)
-	for i := len(records.Records) - 1; i >= 0; i-- {
-		if strings.EqualFold(records.Records[i].Name, name) {
-			recordId = records.Records[i].Id
+	if err := json.Unmarshal(dnsRecords, &recordsResp); err != nil {
+		klog.Errorf("[DEBUG] Failed to parse records: %v", err)
+		return nil
+	}
+
+	// Find the TXT record
+	var rrsetId string
+	for _, record := range recordsResp.Result {
+		klog.Infof("[DEBUG] Checking record: %s (type: %s)", record.Name, record.Type)
+		if record.Type == "TXT" && strings.Contains(record.Name, targetName) {
+			rrsetId = record.Id
+			klog.Infof("[DEBUG] Found record to delete: %s", rrsetId)
 			break
 		}
 	}
 
-	// Delete TXT record
-	url = config.ApiUrl + "/records/" + recordId
-	del, err := callDnsApi(url, "DELETE", nil, config)
-
-	if err != nil {
-		klog.Error(err)
+	if rrsetId == "" {
+		klog.Infof("[DEBUG] No record found to delete, may have been removed already")
+		return nil
 	}
-	klog.Infof("Delete TXT record result: %s", string(del))
+
+	// Delete TXT record - using exact documented endpoint
+	deleteUrl := fmt.Sprintf("%s/zones/%s/rrset/%s", config.ApiUrl, zoneId, rrsetId)
+	klog.Infof("[DEBUG] Deleting record with URL: %s", deleteUrl)
+
+	del, err := callDnsApi(deleteUrl, "DELETE", nil, config)
+	if err != nil {
+		klog.Errorf("[DEBUG] Failed to delete record: %v", err)
+		return nil // Don't fail the cleanup
+	}
+
+	klog.Infof("[DEBUG] Delete TXT record successful")
 	return nil
 }
 
