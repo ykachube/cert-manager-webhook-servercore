@@ -99,6 +99,8 @@ func getAuthToken(config *internal.Config) (string, error) {
 
 	// Get token from header
 	token := resp.Header.Get("X-Subject-Token")
+	klog.Infof("token got: %v", token)
+
 	if token == "" {
 		klog.Errorf("[DEBUG] no token in response! ")
 		return "", errors.New("no token in response")
@@ -217,11 +219,14 @@ func stringFromSecretData(secretData map[string][]byte, key string) (string, err
 
 func addTxtRecord(config internal.Config, ch *v1alpha1.ChallengeRequest) error {
 	zoneId, err := searchZoneId(config)
+
 	if err != nil {
 		return fmt.Errorf("unable to find id for zone name `%s`; %v", config.ZoneName, err)
 	}
 
 	url := fmt.Sprintf("%s/zones/%s/rrset", config.ApiUrl, zoneId) // Use correct endpoint
+
+	klog.Infof("url TXT record call: %s", string(url))
 
 	// Create request payload in the format that worked in your curl tests
 	recordData := map[string]interface{}{
@@ -369,6 +374,7 @@ func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]b
 
 	respBody, _ := io.ReadAll(resp.Body)
 	klog.Infof("resp.StatusCode %v", resp.StatusCode)
+	klog.Infof("respBody %v", respBody)
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 { // Accept any 2xx status code
 		return respBody, nil
