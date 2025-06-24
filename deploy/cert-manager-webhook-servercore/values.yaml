@@ -17,7 +17,7 @@ image:
   repository: ykachube/cert-manager-webhook-servercore
   # Overrides the image tag whose default is {{ printf "v%s" .Chart.AppVersion }}
   tag: ""
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 nameOverride: ""
 fullnameOverride: ""
