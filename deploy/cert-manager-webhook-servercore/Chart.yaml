@@ -1,7 +1,7 @@
 apiVersion: v2
 name: cert-manager-webhook-servercore
-version: 1.5.8
-appVersion: "1.5.8"
+version: 1.5.9
+appVersion: "1.5.9"
 kubeVersion: ">= 1.22.0-0"
 description: Allow cert-manager to solve DNS challenges using Servercore DNS API
 home: https://github.com/ykachube/cert-manager-webhook-servercore

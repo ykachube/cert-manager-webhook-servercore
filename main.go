@@ -394,32 +394,37 @@ func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]b
 }
 
 func searchZoneId(config internal.Config) (string, error) {
-	url := config.ApiUrl + "/zones?name=" + config.ZoneName
+	url := config.ApiUrl + "/zones"
 
-	// Get Zone configuration
+	klog.Infof("[DEBUG] Searching for zones with URL: %s", url)
+
 	zoneRecords, err := callDnsApi(url, "GET", nil, config)
-
 	if err != nil {
-		klog.Errorf("[DEBUG] unable to get zone info %v", err)
+		klog.Errorf("[DEBUG] Failed to get zone info: %v", err)
 		return "", fmt.Errorf("unable to get zone info %v", err)
 	}
 
-	// Unmarshall response
+	klog.Infof("[DEBUG] Got zone response: %s", string(zoneRecords))
+
+	// Unmarshall response with new structure
 	zones := internal.ZoneResponse{}
 	readErr := json.Unmarshal(zoneRecords, &zones)
-
 	if readErr != nil {
-		klog.Errorf("unable to unmarshal response %v", readErr)
-
+		klog.Errorf("[DEBUG] Failed to unmarshal zone response: %v", readErr)
 		return "", fmt.Errorf("unable to unmarshal response %v", readErr)
 	}
 
-	if zones.Meta.Pagination.TotalEntries != 1 {
-		klog.Errorf("wrong number of zones in response %d must be exactly = 1", zones.Meta.Pagination.TotalEntries)
-
-		return "", fmt.Errorf("wrong number of zones in response %d must be exactly = 1", zones.Meta.Pagination.TotalEntries)
+	// Find the matching zone by name
+	for _, zone := range zones.Result {
+		klog.Infof("[DEBUG] Checking zone: %s", zone.Name)
+		if zone.Name == config.ZoneName {
+			klog.Infof("[DEBUG] Found matching zone! ID: %s", zone.Id)
+			return zone.Id, nil
+		}
 	}
-	return zones.Zones[0].Id, nil
+
+	klog.Errorf("[DEBUG] No zone found with name: %s", config.ZoneName)
+	return "", fmt.Errorf("no zone found with name: %s", config.ZoneName)
 }
 
 func searchZoneName(config internal.Config, searchZone string) (string, error) {

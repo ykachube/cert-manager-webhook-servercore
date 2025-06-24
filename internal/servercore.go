@@ -24,8 +24,20 @@ type RecordResponse struct {
 }
 
 type ZoneResponse struct {
-	Zones []Zone `json:"zones"`
-	Meta  Meta   `json:"meta"`
+	Count      int    `json:"count"`
+	NextOffset int    `json:"next_offset"`
+	Result     []Zone `json:"result"`
+}
+
+type Zone struct {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	ProjectId string `json:"project_id"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+	Comment   string `json:"comment"`
+	Disabled  bool   `json:"disabled"`
+	Protected bool   `json:"protected"`
 }
 
 type Meta struct {
@@ -48,27 +60,6 @@ type Record struct {
 	Name     string `json:"name"`
 	Value    string `json:"value"`
 	Ttl      int    `json:"ttl"`
-}
-
-type Zone struct {
-	Id              string       `json:"id"`
-	Created         string       `json:"created"`
-	Modified        string       `json:"modified"`
-	LegacyDnsHost   string       `json:"legacy_dns_host"`
-	LegacyNs        []string     `json:"legacy_ns"`
-	Name            string       `json:"name"`
-	Ns              []string     `json:"ns"`
-	Owner           string       `json:"owner"`
-	Paused          bool         `json:"paused"`
-	Permission      string       `json:"permission"`
-	Project         string       `json:"project"`
-	Registrar       string       `json:"registrar"`
-	Status          string       `json:"status"`
-	Ttl             int          `json:"ttl"`
-	Verified        string       `json:"verified"`
-	RecordsCount    int          `json:"records_count"`
-	IsSecondaryDns  bool         `json:"is_secondary_dns"`
-	TxtVerification Verification `json:"txt_verification"`
 }
 
 type Verification struct {
