@@ -219,34 +219,37 @@ func stringFromSecretData(secretData map[string][]byte, key string) (string, err
 
 func addTxtRecord(config internal.Config, ch *v1alpha1.ChallengeRequest) error {
 	zoneId, err := searchZoneId(config)
-
 	if err != nil {
 		return fmt.Errorf("unable to find id for zone name `%s`; %v", config.ZoneName, err)
 	}
 
-	url := fmt.Sprintf("%s/zones/%s/rrset", config.ApiUrl, zoneId) // Use correct endpoint
-
+	url := fmt.Sprintf("%s/zones/%s/rrset", config.ApiUrl, zoneId)
 	klog.Infof("url TXT record call: %s", string(url))
 
-	// Create request payload in the format that worked in your curl tests
+	// Updated to match the working script format
 	recordData := map[string]interface{}{
-		"name":    ch.ResolvedFQDN, // Use full FQDN with trailing dot
-		"type":    "TXT",
-		"ttl":     60,
-		"records": []string{fmt.Sprintf("\"%s\"", ch.Key)}, // Format TXT value correctly
+		"name": ch.ResolvedFQDN,
+		"type": "TXT",
+		"ttl":  60,
+		"records": []map[string]string{
+			{
+				"content": fmt.Sprintf("\"%s\"", ch.Key),
+			},
+		},
 	}
 
 	jsonData, err := json.Marshal(recordData)
 	if err != nil {
 		klog.Infof("failed to marshal record data: %v", err)
-
 		return fmt.Errorf("failed to marshal record data: %v", err)
 	}
+
+	// Log the actual payload for debugging
+	klog.Infof("Sending payload: %s", string(jsonData))
 
 	add, err := callDnsApi(url, "POST", bytes.NewBuffer(jsonData), config)
 	if err != nil {
 		klog.Infof("callDnsApi: %v", err)
-
 		return err
 	}
 
