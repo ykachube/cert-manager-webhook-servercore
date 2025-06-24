@@ -99,7 +99,6 @@ func getAuthToken(config *internal.Config) (string, error) {
 
 	// Get token from header
 	token := resp.Header.Get("X-Subject-Token")
-	klog.Infof("token got: %v", token)
 
 	if token == "" {
 		klog.Errorf("[DEBUG] no token in response! ")
@@ -157,12 +156,19 @@ func (c *servercoreDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 
 	klog.Infof("[DEBUG] Records response: %s", string(dnsRecords))
 
-	// Find the challenge record
-	acmePrefix := "_acme-challenge."
-	targetName := acmePrefix + recordName(ch.ResolvedFQDN, config.ZoneName)
-	klog.Infof("[DEBUG] Looking for record with name: %s", targetName)
+	// Extract domain part without the _acme-challenge prefix
+	baseDomain := strings.TrimPrefix(ch.ResolvedFQDN, "_acme-challenge.")
+	klog.Infof("[DEBUG] Base domain for matching: %s", baseDomain)
+
+	// Extract record name without _acme-challenge
+	var targetName string
+
+	// Use the ResolvedFQDN directly for matching
+	targetName = ch.ResolvedFQDN
+	klog.Infof("[DEBUG] Looking for exact record with name: %s", targetName)
 
 	var recordsResp struct {
+		Count  int `json:"count"`
 		Result []struct {
 			Id   string `json:"id"`
 			Name string `json:"name"`
@@ -175,19 +181,21 @@ func (c *servercoreDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 		return nil
 	}
 
-	// Find the TXT record
+	// Find the TXT record for this specific challenge
 	var rrsetId string
 	for _, record := range recordsResp.Result {
 		klog.Infof("[DEBUG] Checking record: %s (type: %s)", record.Name, record.Type)
-		if record.Type == "TXT" && strings.Contains(record.Name, targetName) {
+
+		// Exact match for the full challenge FQDN
+		if record.Type == "TXT" && strings.TrimSuffix(record.Name, ".") == strings.TrimSuffix(targetName, ".") {
 			rrsetId = record.Id
-			klog.Infof("[DEBUG] Found record to delete: %s", rrsetId)
+			klog.Infof("[DEBUG] Found exact matching record to delete: %s", rrsetId)
 			break
 		}
 	}
 
 	if rrsetId == "" {
-		klog.Infof("[DEBUG] No record found to delete, may have been removed already")
+		klog.Infof("[DEBUG] No matching record found to delete")
 		return nil
 	}
 
@@ -195,13 +203,13 @@ func (c *servercoreDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 	deleteUrl := fmt.Sprintf("%s/zones/%s/rrset/%s", config.ApiUrl, zoneId, rrsetId)
 	klog.Infof("[DEBUG] Deleting record with URL: %s", deleteUrl)
 
-	del, err := callDnsApi(deleteUrl, "DELETE", nil, config)
+	respBody, err := callDnsApi(deleteUrl, "DELETE", nil, config)
 	if err != nil {
-		klog.Errorf("[DEBUG] Failed to delete record: %v %v ", err, del)
-		return nil // Don't fail the cleanup
+		klog.Errorf("[DEBUG] Failed to delete record: %v", err)
+		return nil
 	}
+	klog.Infof("[DEBUG] Delete TXT record response: %s", string(respBody))
 
-	klog.Infof("[DEBUG] Delete TXT record successful")
 	return nil
 }
 
@@ -400,7 +408,6 @@ func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]b
 
 	respBody, _ := io.ReadAll(resp.Body)
 	klog.Infof("resp.StatusCode %v", resp.StatusCode)
-	klog.Infof("respBody %v", respBody)
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 { // Accept any 2xx status code
 		return respBody, nil
