@@ -78,12 +78,14 @@ func getAuthToken(config *internal.Config) (string, error) {
 
 	jsonData, err := json.Marshal(authRequest)
 	if err != nil {
+		klog.Errorf("[DEBUG] Marshal failed: %v", err)
 		return "", err
 	}
 
 	// Make request to auth API
 	req, err := http.NewRequest("POST", config.AuthURL+"/auth/tokens", bytes.NewBuffer(jsonData))
 	if err != nil {
+		klog.Errorf("[DEBUG] NewRequest failed: %v", err)
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -98,6 +100,7 @@ func getAuthToken(config *internal.Config) (string, error) {
 	// Get token from header
 	token := resp.Header.Get("X-Subject-Token")
 	if token == "" {
+		klog.Errorf("[DEBUG] no token in response! ")
 		return "", errors.New("no token in response")
 	}
 
@@ -339,6 +342,7 @@ func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]b
 	// Get auth token
 	token, err := getAuthToken(&config)
 	if err != nil {
+		klog.Errorf("[DEBUG] failed to get auth token: %v", err)
 		return nil, fmt.Errorf("failed to get auth token: %v", err)
 	}
 
@@ -353,6 +357,7 @@ func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]b
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		klog.Errorf("[DEBUG] HTTP request failed: %v", err)
 		return nil, err
 	}
 
@@ -366,6 +371,8 @@ func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]b
 	text := fmt.Sprintf("Error calling API status: %s url: %s method: %s response: %s",
 		resp.Status, url, method, string(respBody))
 	klog.Error(text)
+	klog.Errorf(text)
+
 	return nil, errors.New(text)
 }
 
@@ -376,6 +383,7 @@ func searchZoneId(config internal.Config) (string, error) {
 	zoneRecords, err := callDnsApi(url, "GET", nil, config)
 
 	if err != nil {
+		klog.Errorf("[DEBUG] unable to get zone info %v", err)
 		return "", fmt.Errorf("unable to get zone info %v", err)
 	}
 
@@ -404,5 +412,6 @@ func searchZoneName(config internal.Config, searchZone string) (string, error) {
 			return config.ZoneName, nil
 		}
 	}
+	klog.Errorf("[DEBUG] unable to find servercore dns zone ")
 	return "", fmt.Errorf("unable to find servercore dns zone with: %s", searchZone)
 }
