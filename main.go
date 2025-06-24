@@ -233,11 +233,15 @@ func addTxtRecord(config internal.Config, ch *v1alpha1.ChallengeRequest) error {
 
 	jsonData, err := json.Marshal(recordData)
 	if err != nil {
+		klog.Infof("failed to marshal record data: %v", err)
+
 		return fmt.Errorf("failed to marshal record data: %v", err)
 	}
 
 	add, err := callDnsApi(url, "POST", bytes.NewBuffer(jsonData), config)
 	if err != nil {
+		klog.Infof("callDnsApi: %v", err)
+
 		return err
 	}
 
@@ -364,6 +368,8 @@ func callDnsApi(url, method string, body io.Reader, config internal.Config) ([]b
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+	klog.Infof("resp.StatusCode %v", resp.StatusCode)
+
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 { // Accept any 2xx status code
 		return respBody, nil
 	}
