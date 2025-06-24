@@ -220,6 +220,8 @@ func stringFromSecretData(secretData map[string][]byte, key string) (string, err
 func addTxtRecord(config internal.Config, ch *v1alpha1.ChallengeRequest) error {
 	zoneId, err := searchZoneId(config)
 	if err != nil {
+		klog.Infof("unable to find id for zone name `%s`; %v", config.ZoneName, err)
+
 		return fmt.Errorf("unable to find id for zone name `%s`; %v", config.ZoneName, err)
 	}
 
@@ -407,10 +409,14 @@ func searchZoneId(config internal.Config) (string, error) {
 	readErr := json.Unmarshal(zoneRecords, &zones)
 
 	if readErr != nil {
+		klog.Errorf("unable to unmarshal response %v", readErr)
+
 		return "", fmt.Errorf("unable to unmarshal response %v", readErr)
 	}
 
 	if zones.Meta.Pagination.TotalEntries != 1 {
+		klog.Errorf("wrong number of zones in response %d must be exactly = 1", zones.Meta.Pagination.TotalEntries)
+
 		return "", fmt.Errorf("wrong number of zones in response %d must be exactly = 1", zones.Meta.Pagination.TotalEntries)
 	}
 	return zones.Zones[0].Id, nil
