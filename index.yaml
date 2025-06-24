@@ -4,6 +4,31 @@ entries:
   - annotations:
       artifacthub.io/license: Apache-2.0
     apiVersion: v2
+    appVersion: 1.5.9
+    created: "2025-06-24T19:27:41.546773421Z"
+    description: Allow cert-manager to solve DNS challenges using Servercore DNS API
+    digest: ee5cd93c494ec42155a8f2217095713e992c29d9e8a154e22c476a1bc118c801
+    home: https://github.com/ykachube/cert-manager-webhook-servercore
+    icon: https://raw.githubusercontent.com/cert-manager/cert-manager/master/logo/logo-small.png
+    keywords:
+    - cert-manager
+    - servercore
+    - kube-lego
+    - letsencrypt
+    - tls
+    kubeVersion: '>= 1.22.0-0'
+    maintainers:
+    - email: yury_kachubeyeu@gmail.com
+      name: ykachube
+    name: cert-manager-webhook-servercore
+    sources:
+    - https://github.com/ykachube/cert-manager-webhook-servercore
+    urls:
+    - https://github.com/ykachube/cert-manager-webhook-servercore/releases/download/cert-manager-webhook-servercore-1.5.9/cert-manager-webhook-servercore-1.5.9.tgz
+    version: 1.5.9
+  - annotations:
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
     appVersion: 1.5.8
     created: "2025-06-24T19:15:59.609870971Z"
     description: Allow cert-manager to solve DNS challenges using Servercore DNS API
@@ -251,4 +276,4 @@ entries:
     urls:
     - https://ykachube.github.io/cert-manager-webhook-servercore/cert-manager-webhook-servercore-1.0.0.tgz
     version: 1.0.0
-generated: "2025-06-24T19:15:59.60991306Z"
+generated: "2025-06-24T19:27:41.546820359Z"
