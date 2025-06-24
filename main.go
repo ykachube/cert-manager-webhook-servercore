@@ -197,7 +197,7 @@ func (c *servercoreDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 
 	del, err := callDnsApi(deleteUrl, "DELETE", nil, config)
 	if err != nil {
-		klog.Errorf("[DEBUG] Failed to delete record: %v", err)
+		klog.Errorf("[DEBUG] Failed to delete record: %v %v ", err, del)
 		return nil // Don't fail the cleanup
 	}
 
